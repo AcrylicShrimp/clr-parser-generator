@@ -1,4 +1,4 @@
-use super::parser::{RuleItem, RuleItemType, RuleTable};
+use super::parser::{RuleItem, RuleTable};
 use itertools::Itertools;
 use std::cmp::{Eq, PartialEq};
 use std::collections::hash_map::Entry;
@@ -141,12 +141,15 @@ impl Gen {
 	fn update_set(first_set: &mut FirstSet, rule_name: &String, rule_item: &RuleItem) -> bool {
 		let mut first_item_vec: Vec<String> = Vec::new();
 
-		if rule_item.item_type == RuleItemType::Literal {
-			first_item_vec.push(rule_item.item_content.clone());
-		} else {
-			for src_first_set_item in first_set.get(&rule_item.item_content).unwrap().iter() {
-				first_item_vec.push(src_first_set_item.clone());
+		match rule_item {
+			RuleItem::Terminal(terminal) => first_item_vec.push(terminal.token_content.clone()),
+			RuleItem::NonTerminal(non_ternimal) => {
+				for src_first_set_item in first_set.get(&non_ternimal.token_content).unwrap().iter()
+				{
+					first_item_vec.push(src_first_set_item.clone());
+				}
 			}
+			_ => unreachable!(),
 		}
 
 		let first = first_set.get_mut(rule_name).unwrap();

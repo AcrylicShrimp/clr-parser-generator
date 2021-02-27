@@ -1,16 +1,21 @@
 use std::vec::Vec;
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum Type {
 	EoF,
 	Unknown,
 	Colon,
 	Semicolon,
-	Id,
-	Literal,
+	Equal,
+	BraceL,
+	BraceR,
+	BracketL,
+	BracketR,
+	Terminal,
+	NonTerminal,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Token {
 	pub token_type: Type,
 	pub token_content: String,
@@ -41,30 +46,36 @@ impl Lexer {
 		}
 	}
 
-	pub fn next(&mut self) -> Token {
+	pub fn next(&mut self, advance: bool) -> Token {
+		let current_index = self.index;
+		let current_line_number = self.line_number;
+		let current_line_offset = self.line_offset;
+
 		let (content, line_number, line_offset) = self.next_blackspace();
 		let mut content = content.to_string();
 
-		if content == "\0" {
+		let token_type = match content.as_str() {
+			"\0" => Some(Type::EoF),
+			":" => Some(Type::Colon),
+			";" => Some(Type::Semicolon),
+			"=" => Some(Type::Equal),
+			"[" => Some(Type::BracketL),
+			"]" => Some(Type::BracketR),
+			"{" => Some(Type::BraceL),
+			"}" => Some(Type::BraceR),
+			_ => None,
+		};
+
+		if let Some(token_type) = token_type {
+			if !advance {
+				self.index = current_index;
+				self.line_number = current_line_number;
+				self.line_offset = current_line_offset;
+			}
+
 			return Token {
-				token_type: Type::EoF,
-				token_content: "\0".to_string(),
-				line_number,
-				line_offset,
-			};
-		}
-		if content == ":" {
-			return Token {
-				token_type: Type::Colon,
-				token_content: ":".to_string(),
-				line_number,
-				line_offset,
-			};
-		}
-		if content == ";" {
-			return Token {
-				token_type: Type::Semicolon,
-				token_content: ";".to_string(),
+				token_type,
+				token_content: content,
 				line_number,
 				line_offset,
 			};
@@ -77,26 +88,45 @@ impl Lexer {
 			self.line_offset += 1;
 		}
 
-		let mut id = false;
+		let mut is_ternimal = true;
 
 		if content.starts_with("@") {
-			id = true;
+			is_ternimal = false;
 			content = content.chars().skip(1).collect();
 		}
 
 		if content.is_empty() {
 			self.index += 1;
 			self.line_offset += 1;
-			return Token {
+
+			let token = Token {
 				token_type: Type::Unknown,
 				token_content: self.content[self.index - 1].to_string(),
 				line_number,
 				line_offset,
 			};
+
+			if !advance {
+				self.index = current_index;
+				self.line_number = current_line_number;
+				self.line_offset = current_line_offset;
+			}
+
+			return token;
+		}
+
+		if !advance {
+			self.index = current_index;
+			self.line_number = current_line_number;
+			self.line_offset = current_line_offset;
 		}
 
 		Token {
-			token_type: if id { Type::Id } else { Type::Literal },
+			token_type: if is_ternimal {
+				Type::Terminal
+			} else {
+				Type::NonTerminal
+			},
 			token_content: content,
 			line_number,
 			line_offset,
@@ -128,7 +158,7 @@ impl Lexer {
 
 	fn is_punctuation(&self) -> bool {
 		match self.content[self.index] {
-			':' | ';' | '@' => true,
+			':' | ';' | '@' | '=' | '[' | ']' | '{' | '}' => true,
 			_ => false,
 		}
 	}
