@@ -8,7 +8,22 @@ You have to define syntax by writing rules in BNF-like notation.
 
 ### rule notation
 
-TODO: Fill here.
+The goal of rule notations are defining `non-terminal`s easily. There are some syntaxes supported.
+
+```
+non-terminal =name-of-ast-variant: terminal @non-terminal [optional] {repeat} [{optional-repeat}];
+```
+
+The names of ast variant are needed when generating AST automatically. It will generate AST nodes by representing them in the enum variants supported by the Rust, so each variant must have a unique name.
+
+Please keep in mind that there's no alternation. If you need, define them multiple times with a unique ast varient name.
+
+```
+non-terminal =ast-name-1: terminal;
+non-terminal =ast-name-2: @non-terminal terminal @non-terminal;
+```
+
+Please refer the examples in the `test` directory for more practical/advanced usage.
 
 ## about lexer and ast
 
