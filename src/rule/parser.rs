@@ -1,18 +1,19 @@
-use super::lexer::{Lexer, Token, Type};
+use super::lexer::{Lexer, Type};
 use std::collections::HashMap;
 use std::vec::Vec;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum RuleItem {
-	Terminal(Token),
-	NonTerminal(Token),
+	Terminal(String),
+	NonTerminal(String),
+	FlattenNonTerminal(String),
 	Option(Vec<RuleItem>),
 	Repeat(Vec<RuleItem>),
 }
 
 struct PartialRule {
-	pub name: Token,
-	pub sub_name: Option<Token>,
+	pub name: String,
+	pub sub_name: Option<String>,
 	pub items: Vec<RuleItem>,
 	pub flatten: bool,
 }
@@ -21,7 +22,9 @@ struct PartialRule {
 pub struct Rule {
 	pub index: usize,
 	pub name: String,
+	pub sub_name: Option<String>,
 	pub items: Vec<RuleItem>,
+	pub flatten: bool,
 }
 
 impl Rule {
@@ -30,8 +33,15 @@ impl Rule {
 	}
 }
 
+impl PartialEq for Rule {
+	fn eq(&self, other: &Self) -> bool {
+		self.name == other.name && self.items == other.items
+	}
+}
+
 #[derive(Debug)]
 pub struct RuleTable {
+	pub names: Vec<String>,
 	pub rule_vec: Vec<Rule>,
 	pub rule_map: HashMap<String, Vec<usize>>,
 }
@@ -39,6 +49,7 @@ pub struct RuleTable {
 impl RuleTable {
 	pub fn new() -> RuleTable {
 		RuleTable {
+			names: Vec::new(),
 			rule_vec: Vec::new(),
 			rule_map: HashMap::new(),
 		}
@@ -46,6 +57,7 @@ impl RuleTable {
 
 	fn add_rule(&mut self, partial_rule: PartialRule) {
 		// Resolve options.
+		// Convert RuleItem::Option into multiple sequences of RuleItem::Terminal or RuleItem::NonTerminal.
 		let mut items = vec![partial_rule.items];
 		let mut index = 0;
 
@@ -74,17 +86,63 @@ impl RuleTable {
 			index += 1;
 		}
 
+		// Resolve repeats.
+		// Add a new partial rules for each RuleItem::Repeat.
+		for items in items.iter_mut() {
+			for item in items.iter_mut() {
+				if let RuleItem::Repeat(repeat_items) = item {
+					let new_partial_rule_name = format!("{}!{}", partial_rule.name, index);
+					let mut rule_items = Vec::new();
+					rule_items.append(repeat_items);
+					rule_items.push(RuleItem::Option(vec![RuleItem::FlattenNonTerminal(
+						new_partial_rule_name.clone(),
+					)]));
+					*item = RuleItem::FlattenNonTerminal(new_partial_rule_name.clone());
+					self.add_rule(PartialRule {
+						name: new_partial_rule_name,
+						sub_name: None,
+						items: rule_items,
+						flatten: true,
+					})
+				}
+
+				index += 1;
+			}
+		}
+
 		for items in items {
 			let index = self.rule_vec.len();
+			if !self.names.contains(&partial_rule.name) {
+				self.names.push(partial_rule.name.clone());
+			}
 			self.rule_map
-				.entry(partial_rule.name.token_content.clone())
+				.entry(partial_rule.name.clone())
 				.or_default()
 				.push(index);
 			self.rule_vec.push(Rule {
 				index,
-				name: partial_rule.name.token_content.clone(),
+				name: partial_rule.name.clone(),
+				sub_name: partial_rule.sub_name.clone(),
 				items,
+				flatten: partial_rule.flatten,
 			});
+		}
+	}
+
+	fn dedupe(&mut self) {
+		self.names.dedup();
+		self.rule_vec.dedup();
+		self.rule_map.clear();
+
+		let mut index = 0;
+
+		for rule in self.rule_vec.iter_mut() {
+			rule.index = index;
+			self.rule_map
+				.entry(rule.name.clone())
+				.or_default()
+				.push(index);
+			index += 1;
 		}
 	}
 }
@@ -115,6 +173,7 @@ impl Parser {
 			};
 		}
 
+		rule_table.dedupe();
 		rule_table
 	}
 
@@ -165,8 +224,8 @@ impl Parser {
 		}
 
 		let mut partial_rule = PartialRule {
-			name: name,
-			sub_name,
+			name: name.token_content,
+			sub_name: sub_name.map(|token| token.token_content),
 			items: Vec::new(),
 			flatten: false,
 		};
@@ -212,8 +271,8 @@ impl Parser {
 
 		match token.token_type {
 			Type::Semicolon | Type::BraceR | Type::BracketR => None,
-			Type::Terminal => Some(RuleItem::Terminal(self.lexer.next(true))),
-			Type::NonTerminal => Some(RuleItem::NonTerminal(self.lexer.next(true))),
+			Type::Terminal => Some(RuleItem::Terminal(self.lexer.next(true).token_content)),
+			Type::NonTerminal => Some(RuleItem::NonTerminal(self.lexer.next(true).token_content)),
 			Type::BraceL => {
 				self.lexer.next(true);
 

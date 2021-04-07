@@ -1,3 +1,4 @@
-// pub mod gen;
+pub mod gen;
 pub mod lexer;
-pub mod parser;
+pub mod normalized_rule_table;
+pub mod rule_table;
