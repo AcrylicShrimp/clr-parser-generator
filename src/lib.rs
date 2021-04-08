@@ -101,6 +101,7 @@ pub fn generate_all(rules: String) -> String {
     format!(
         r#"
 use super::lexer::*;
+use super::token::*;
 use lazy_static::lazy_static;
 use std::collections::HashMap;
 
@@ -126,7 +127,7 @@ lazy_static! {{
 	];
 }}
 
-pub fn parse(mut lexer: Lexer) -> Result<RawAST, String> {{
+pub fn parse(mut lexer: Lexer) -> Result<AST, String> {{
 	let mut state = 0;
 	let mut stack: Vec<StackItem> = vec![StackItem::State(state)];
 
@@ -161,7 +162,7 @@ pub fn parse(mut lexer: Lexer) -> Result<RawAST, String> {{
 			Action::Accept => {{
 				stack.pop();
 				return Ok(match stack.pop().unwrap() {{
-					StackItem::AST(ast) => ast,
+					StackItem::AST(ast) => raw_ast_to_ast(ast),
 					_ => unreachable!(),
 				}});
 			}}

@@ -58,8 +58,8 @@ pub enum NormalizedRuleOriginType {
     OptionSome(Vec<NormalizedRuleOriginType>),
     OptionNone,
     Repeat(String),
-    RepeatEnd(String),
-    RepeatContinue(String),
+    Repeater(usize),
+    RepeaterContinue(usize),
 }
 
 impl NormalizedRuleItem {
@@ -154,7 +154,7 @@ fn normalize_repeat(rule: Rule) -> Vec<NormalizedRule> {
                 internal_rule_items.append(repeat_items);
                 internal_rule_items.push(RuleItem::Option(vec![RuleItem::NonTerminal(internal_rule_name.clone())]));
 
-                *item = RuleItem::NonTerminal(internal_rule_name.clone());
+                *item = RuleItem::Repeat(vec![RuleItem::NonTerminal(internal_rule_name.clone())]);
 
                 rules.extend(
                     normalize_repeat(Rule {
@@ -165,11 +165,26 @@ fn normalize_repeat(rule: Rule) -> Vec<NormalizedRule> {
                     .into_iter()
                     .map(|mut rule| {
                         rule.is_internal = true;
+
+                        let mut is_continued = false;
+                        for item in &rule.items {
+                            if let NormalizedRuleItem::NonTerminal(non_terminal) = item {
+                                if non_terminal == &internal_rule_name {
+                                    is_continued = true;
+                                    break;
+                                }
+                            }
+                        }
+
+                        rule.origin_type = vec![if is_continued {
+                            NormalizedRuleOriginType::RepeaterContinue(rule.items.len())
+                        } else {
+                            NormalizedRuleOriginType::Repeater(rule.items.len())
+                        }];
+
                         rule
                     }),
                 );
-
-                // items.1 .0[inner_index] = NormalizedRuleOriginType::Repeat(internal_rule_name);
             }
         }
     }
@@ -185,6 +200,10 @@ fn normalize_repeat(rule: Rule) -> Vec<NormalizedRule> {
             .map(|rule_item| match rule_item {
                 RuleItem::Terminal(..) => NormalizedRuleOriginType::Terminal,
                 RuleItem::NonTerminal(non_terminal) => NormalizedRuleOriginType::NonTerminal(non_terminal.clone()),
+                RuleItem::Repeat(repeat) => NormalizedRuleOriginType::Repeat(match &repeat[0] {
+                    RuleItem::NonTerminal(non_terminal) => non_terminal.clone(),
+                    _ => unreachable!(),
+                }),
                 _ => unreachable!(),
             })
             .collect::<Vec<_>>();
@@ -212,6 +231,10 @@ fn normalize_repeat(rule: Rule) -> Vec<NormalizedRule> {
                 .map(|item| match item {
                     RuleItem::Terminal(terminal) => NormalizedRuleItem::Terminal(terminal),
                     RuleItem::NonTerminal(non_terminal) => NormalizedRuleItem::NonTerminal(non_terminal),
+                    RuleItem::Repeat(mut repeat) => NormalizedRuleItem::NonTerminal(match repeat.pop().unwrap() {
+                        RuleItem::NonTerminal(non_terminal) => non_terminal,
+                        _ => unreachable!(),
+                    }),
                     _ => unreachable!(),
                 })
                 .collect(),
