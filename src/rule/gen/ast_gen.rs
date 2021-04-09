@@ -86,7 +86,8 @@ pub fn generate_ast(rule_table: &RuleTable) -> String {
             .into_iter()
             .map(|(name, members)| {
                 format!(
-                    r#"pub enum {} {{
+                    r#"#[derive(Debug)]
+pub enum {} {{
 	{}
 }}"#,
                     name,

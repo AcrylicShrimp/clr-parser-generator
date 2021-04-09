@@ -99,7 +99,9 @@ pub fn generate_all(rules: String) -> String {
         .join(",\n\t\t");
 
     format!(
-        r#"
+        r#"#[allow(non_camel_case_types)]
+#[allow(non_upper_case_globals)]
+
 use super::lexer::*;
 use super::token::*;
 use lazy_static::lazy_static;

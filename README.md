@@ -25,11 +25,11 @@ non-terminal =ast-name-2: @non-terminal terminal @non-terminal;
 
 Please refer the examples in the `test` directory for more practical/advanced usage.
 
-## about lexer and ast
+## about lexer
 
-lexer and ast is **not** generated currently. You have to supply it by creating `lexer.rs` and `ast.rs`(or something) in same location and define `mod` of them.
+A lexer is **not** generated currently. You have to supply it by creating `lexer.rs` in same location and define `mod` of them.
 
-Here's the example implementation of the `lexer.rs` and `ast.rs`.
+Here's the example implementation of the `lexer.rs`.
 
 ```
 // lexer.rs
@@ -717,24 +717,5 @@ impl Lexer {
             _ => return_token(TokenType::Id, content),
         }
     }
-}
-```
-
-```
-// ast.rs
-
-use super::lexer::*;
-
-pub enum AST {
-	AST,
-	Token(Token),
-}
-
-pub fn build_ast_terminal(token: Token) -> AST {
-	AST::Token(token)
-}
-
-pub fn build_ast_nonterminal(name: &str, ast: Vec<AST>) -> AST {
-	AST::AST
 }
 ```

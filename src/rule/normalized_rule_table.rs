@@ -146,7 +146,7 @@ fn normalize_repeat(rule: Rule) -> Vec<NormalizedRule> {
     let mut items = normalize_options(rule).into_iter().enumerate().collect::<Vec<_>>();
 
     for (index, items) in items.iter_mut() {
-        for (inner_index, item) in items.0.iter_mut().enumerate() {
+        for item in items.0.iter_mut() {
             if let RuleItem::Repeat(repeat_items) = item {
                 let internal_rule_name = format!("_{}-{}", name, index);
                 let mut internal_rule_items = Vec::new();

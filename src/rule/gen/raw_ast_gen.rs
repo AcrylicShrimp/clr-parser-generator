@@ -39,6 +39,25 @@ pub fn resolve_type_rule(rule: &NormalizedRule) -> String {
 }
 
 pub fn generate_raw_ast(rule_table: &NormalizedRuleTable) -> String {
+    let entry_rule_name = if let NormalizedRuleItem::NonTerminal(non_terminal) = &rule_table.rules[rule_table.rule_name_index_map.get("__root").unwrap()[0]].items[0] {
+        format!(
+            "{}{}",
+            if non_terminal.starts_with("_") { "_" } else { "" },
+            non_terminal
+                .split(|c| c == '-' || c == '_')
+                .map(|token| {
+                    let mut chars = token.chars();
+                    match chars.next() {
+                        Some(ch) => ch.to_uppercase().collect::<String>() + chars.as_str(),
+                        None => String::new(),
+                    }
+                })
+                .collect::<String>()
+        )
+    } else {
+        unreachable!()
+    };
+
     let mut rule_names = HashMap::new();
 
     for rule in &rule_table.rules {
@@ -99,19 +118,23 @@ fn build_ast_nonterminal(name: &str, child_asts: Vec<RawAST>) -> RawAST {{
 	}}
 }}
 
-fn raw_ast_to_ast(ast: RawAST) -> AST {{
-    let root_ast = match ast {{
-        RawAST::_Root(root_ast) => root_ast,
+fn raw_ast_to_ast(root_ast: RawAST) -> AST {{
+    match root_ast {{
+        RawAST::{}(ast) => (Box::new(raw_ast_to_ast_{}(ast)),),
         _ => unreachable!(),
-    }};
-
-    {}
+    }}
 }}
 
 {}"#,
-        rule_names.iter().map(|(name, ..)| format!("{}(RawAST{}),", name, name)).collect::<Vec<_>>().join("\n\t"),
         rule_names
             .iter()
+            .filter(|&(name, _)| name != "__root")
+            .map(|(name, ..)| format!("{}(RawAST{}),", name, name))
+            .collect::<Vec<_>>()
+            .join("\n\t"),
+        rule_names
+            .iter()
+            .filter(|&(name, _)| name != "__root")
             .map(|(name, members)| {
                 format!(
                     r#"#[derive(Debug)]
@@ -119,12 +142,7 @@ pub enum RawAST{} {{
 	{}
 }}"#,
                     name,
-                    members
-                        .1
-                        .iter()
-                        .map(|member| format!("{}{}, // {} {:?}", member.name, member.ty, member.rule_origin_reduce_name, member.rule_types))
-                        .collect::<Vec<_>>()
-                        .join("\n\t")
+                    members.1.iter().map(|member| format!("{}{},", member.name, member.ty)).collect::<Vec<_>>().join("\n\t")
                 )
             })
             .collect::<Vec<_>>()
@@ -176,7 +194,8 @@ pub enum RawAST{} {{
             .flatten()
             .collect::<Vec<_>>()
             .join("\n\t\t"),
-        generate_raw_ast_to_ast_logic_root(&rule_names.get("_Root").unwrap().1),
+        entry_rule_name,
+        entry_rule_name,
         rule_names
             .iter()
             .filter(|&(name, _)| name != "_Root")
@@ -187,44 +206,6 @@ pub enum RawAST{} {{
             })
             .collect::<Vec<_>>()
             .join("\n\n")
-    )
-}
-
-fn generate_raw_ast_to_ast_logic_root(members: &Vec<Member>) -> String {
-    format!(
-        r#"match root_ast {{
-    {}
-}}"#,
-        members
-            .iter()
-            .map(|member| {
-                format!(
-                    "RawAST_Root::{}(ast) => (Box::new({}),),",
-                    member.name,
-                    match &member.rule_items[0] {
-                        NormalizedRuleItem::NonTerminal(non_terminal) => {
-                            let name = format!(
-                                "{}{}",
-                                if non_terminal.starts_with("_") { "_" } else { "" },
-                                non_terminal
-                                    .split(|c| c == '-' || c == '_')
-                                    .map(|token| {
-                                        let mut chars = token.chars();
-                                        match chars.next() {
-                                            Some(ch) => ch.to_uppercase().collect::<String>() + chars.as_str(),
-                                            None => String::new(),
-                                        }
-                                    })
-                                    .collect::<String>()
-                            );
-                            format!("raw_ast_to_ast_{}(*ast)", name)
-                        }
-                        _ => unreachable!(),
-                    }
-                )
-            })
-            .collect::<Vec<_>>()
-            .join("\n\t")
     )
 }
 
